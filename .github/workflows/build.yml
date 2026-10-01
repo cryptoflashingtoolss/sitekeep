@@ -63,12 +63,38 @@ jobs:
       - name: Create Android project (if not committed)
         run: |
           if [ ! -d src-tauri/gen/android ]; then npx tauri android init --ci; fi
-      - name: Build APK (debug-signed, installable by sideloading)
-        run: npx tauri android build --apk --debug --ci
+      - name: Build optimized APK for 64-bit ARM phones
+        run: npx tauri android build --apk --target aarch64 --ci
+      - name: Sign the APK so Android will install it
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -e
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=$(find src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -1)
+          echo "Unsigned APK: $APK ($(du -h "$APK" | cut -f1))"
+          KS="$RUNNER_TEMP/sitekeep.jks"
+          if [ -n "$KEYSTORE_B64" ]; then
+            # Stable key from repository secrets: updates install over the previous version.
+            echo "$KEYSTORE_B64" | base64 -d > "$KS"
+            PW="$KEYSTORE_PASSWORD"
+          else
+            # No key saved yet: make a one-off key. Uninstall the old app before installing a new build.
+            PW=$(openssl rand -hex 16)
+            keytool -genkeypair -keystore "$KS" -storepass "$PW" -keypass "$PW" -alias sitekeep \
+              -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=SiteKeep" -noprompt
+          fi
+          "$BT/zipalign" -p -f 4 "$APK" "$RUNNER_TEMP/aligned.apk"
+          mkdir -p apk-out
+          "$BT/apksigner" sign --ks "$KS" --ks-pass "pass:$PW" --out apk-out/SiteKeep-Android.apk "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" verify apk-out/SiteKeep-Android.apk
+          rm -f "$KS"
+          ls -lh apk-out
       - uses: actions/upload-artifact@v4
         with:
           name: sitekeep-android
-          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          path: apk-out/SiteKeep-Android.apk
 
   release:
     needs: [windows, android]
