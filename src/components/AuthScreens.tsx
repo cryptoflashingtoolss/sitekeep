@@ -211,10 +211,10 @@ function ForgotPassword({ initialEmail, onBack, onUnlocked, demo }: {
     <form className="auth-form" onSubmit={run(async () => { await V.sendResetCode(email); setStep('code'); })}>
       {back}
       <h1 className="display">Forgot your password</h1>
-      <p className="lede">We'll email you a 6-digit code to prove it's you.</p>
+      <p className="lede">We'll email you a reset link to prove it's you.</p>
       <Field label="Email"><input id="forgot-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus /></Field>
       {errBox}
-      <button className="btn btn-primary btn-block" disabled={busy}>{busy ? <Spinner /> : 'Email me a code'}</button>
+      <button className="btn btn-primary btn-block" disabled={busy}>{busy ? <Spinner /> : 'Email me a reset link'}</button>
     </form>
   );
 
@@ -222,11 +222,17 @@ function ForgotPassword({ initialEmail, onBack, onUnlocked, demo }: {
     <form className="auth-form" onSubmit={run(async () => { const r = await V.verifyResetCode(email, code); setHasKey(r.hasRecoveryKey); setStep(r.hasRecoveryKey ? 'choose' : 'fresh'); })}>
       {back}
       <h1 className="display">Check your email</h1>
-      <p className="lede">Enter the code we sent to {email}.{demo && ' Demo: any 6 digits work.'}</p>
-      <Field label="Code"><input id="forgot-code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} required autoFocus className="mono code-input" /></Field>
+      <p className="lede">
+        We sent a "Reset your password" email to {email}. Don't open the link in your browser. Copy it instead
+        (right-click or long-press it, then Copy link) and paste it here.{demo && ' Demo: any 6 digits work.'}
+      </p>
+      <Field label="Reset link or code" hint="If you already clicked the link, copy the full address of the page it opened and paste that.">
+        <input id="forgot-code" value={code} onChange={(e) => setCode(e.target.value)} required autoFocus
+          placeholder="https://…supabase.co/auth/v1/verify?token=…" className="mono" autoComplete="off" spellCheck={false} />
+      </Field>
       {errBox}
       <button className="btn btn-primary btn-block" disabled={busy}>{busy ? <Spinner /> : 'Continue'}</button>
-      <button type="button" className="link-btn center" onClick={() => V.sendResetCode(email).then(() => setErr(''), () => undefined)}>Send a new code</button>
+      <button type="button" className="link-btn center" onClick={() => V.sendResetCode(email).then(() => setErr(''), () => undefined)}>Send a new email</button>
     </form>
   );
 

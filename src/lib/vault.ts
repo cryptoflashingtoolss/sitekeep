@@ -165,17 +165,58 @@ export async function createRecoveryKey(): Promise<string> {
 
 // ------------------------------------------------------- forgot password
 
-/** Step 1: email a 6-digit code (Supabase "Reset password" email). */
+/** Step 1: send the Supabase "Reset password" email (a link, or a code with a custom template). */
 export async function sendResetCode(email: string): Promise<void> {
   const { error } = await sb().auth.resetPasswordForEmail(email.trim());
   fail(error, 'Could not send the code');
 }
 
-/** Step 2: check the code. Signs in to the sync database only; the vault stays locked. */
-export async function verifyResetCode(email: string, code: string): Promise<{ hasRecoveryKey: boolean }> {
-  const { data, error } = await sb().auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'recovery' });
-  if (error) throw new Error('That code is wrong or has expired. Request a new one.');
-  const { data: prof } = await sb().from('profiles').select('enc_private_key_recovery').eq('id', data.user!.id).maybeSingle();
+/**
+ * Step 2: prove it's you. Accepts any of:
+ *  - the 6-digit code (if your Supabase email template shows {{ .Token }}),
+ *  - the "Reset password" link from the default email (copied, not clicked), or
+ *  - the address the link opened after clicking it (it carries a sign-in token).
+ * Signs in to the sync database only; the vault stays locked.
+ */
+export async function verifyResetCode(email: string, input: string): Promise<{ hasRecoveryKey: boolean }> {
+  const value = input.trim();
+  let userId: string | undefined;
+  const fail401 = () => new Error('That code or link is wrong, already used or expired. Request a new email.');
+
+  if (/^\d{6,10}$/.test(value)) {
+    const { data, error } = await sb().auth.verifyOtp({ email: email.trim(), token: value, type: 'recovery' });
+    if (error) throw fail401();
+    userId = data.user?.id;
+  } else {
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new Error('Paste the whole link from the email, starting with https://');
+    }
+    const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
+    const accessToken = hash.get('access_token');
+    const refreshToken = hash.get('refresh_token');
+    const tokenHash = url.searchParams.get('token_hash') ?? url.searchParams.get('token');
+    if (accessToken && refreshToken) {
+      const { data, error } = await sb().auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+      if (error) throw fail401();
+      userId = data.user?.id;
+    } else if (tokenHash) {
+      const { data, error } = await sb().auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
+      if (error) throw fail401();
+      userId = data.user?.id;
+    } else {
+      throw new Error("That link doesn't contain a reset token. Copy the link from the \"Reset password\" email.");
+    }
+  }
+  if (!userId) throw fail401();
+  const { data: auth } = await sb().auth.getUser();
+  if (auth.user?.email && auth.user.email.toLowerCase() !== email.trim().toLowerCase()) {
+    await sb().auth.signOut();
+    throw new Error('That link belongs to a different email address.');
+  }
+  const { data: prof } = await sb().from('profiles').select('enc_private_key_recovery').eq('id', userId).maybeSingle();
   return { hasRecoveryKey: !!prof?.enc_private_key_recovery };
 }
 

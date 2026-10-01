@@ -38,7 +38,7 @@ Every time the project changes, a new release appears with fresh installers. On 
 
 Because only you know your master password, **no admin (and not Supabase) can reset it and still read your data**. That's what keeps the vault safe. Instead:
 
-- **Recovery key**: everyone gets one when they create their vault (and can make one in Settings). Forgot your password? Tap **Forgot your password?**, enter the code SiteKeep emails you, then your recovery key, and choose a new password. Nothing is lost.
+- **Recovery key**: everyone gets one when they create their vault (and can make one in Settings). Forgot your password? Tap **Forgot your password?**, paste the reset link SiteKeep emails you, then enter your recovery key, and choose a new password. Nothing is lost.
 - **No recovery key?** The person starts a fresh vault from the same email. Shared sites come back after a teammate who can edit those sites taps **Restore access** (on the Team page or the site's page). Restoring is a deliberate click on purpose: check with the person by phone or chat first, because someone who broke into their email could also start a fresh vault. Sites only they could open are lost.
 - **Admin panel (Team page)**: the first person to create a vault is the admin. Admins invite people (only invited emails can join), see everyone and how many sites each has, make or remove admins, and remove someone from all their sites when they leave.
 
@@ -49,12 +49,7 @@ Because only you know your master password, **no admin (and not Supabase) can re
 1. Create a free project at [supabase.com](https://supabase.com).
 2. Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`, click **Run**. (Already ran an older version? Just run the new one; it upgrades in place.)
 3. **Authentication → Sign In / Providers → Email**: turn **off "Confirm email"** (simpler for a private team app).
-4. **Authentication → Emails → Reset Password**: replace the message body with something that shows the code, for example:
-   ```html
-   <h2>Your SiteKeep code</h2>
-   <p>Enter this code in SiteKeep to reset your password: <strong>{{ .Token }}</strong></p>
-   ```
-   This is what the "Forgot your password?" screen asks for.
+4. Nothing to change for password-reset emails. Supabase's default "Reset your password" email works: in SiteKeep, the person copies the link from that email (or the address it opens) and pastes it on the "Forgot your password?" screen. *(Optional: if you set up your own email sender under Authentication → Emails → SMTP, you can put `{{ .Token }}` in the Reset Password template to send a 6-digit code instead. The app accepts both.)*
 5. **Project Settings → API**: copy the **Project URL** and the **anon** (or **publishable**) key. **Never** use the `service_role` key in the app.
 6. Open SiteKeep, paste those two values, and **Create your vault**. You're the admin. Invite your team from the **Team** page.
 
