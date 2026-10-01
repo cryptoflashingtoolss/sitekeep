@@ -1,0 +1,17 @@
+{
+  "identifier": "default",
+  "description": "Permissions for the SiteKeep window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "clipboard-manager:allow-write-text",
+    "notification:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://api.blackbox.ai/*" },
+        { "url": "https://enterprise.blackbox.ai/*" }
+      ]
+    }
+  ]
+}
